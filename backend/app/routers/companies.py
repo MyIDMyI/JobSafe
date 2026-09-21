@@ -27,7 +27,11 @@ def _get_company_or_404(db: Session, company_id: int) -> Company:
 
 @router.get("", response_model=list[CompanyRead])
 def list_companies(db: Session = Depends(get_db)):
-    stmt = select(Company).options(selectinload(Company.checks)).order_by(Company.id.desc())
+    stmt = (
+        select(Company)
+        .options(selectinload(Company.checks))
+        .order_by(Company.id.desc())
+    )
     return list(db.scalars(stmt).unique().all())
 
 
@@ -56,31 +60,21 @@ async def run_check(company_id: int, db: Session = Depends(get_db)):
     company = _get_company_or_404(db, company_id)
     previous = company.checks[0] if company.checks else None
 
-    result = await Work24Client().check_all(company)
-
-    current_values = {
-        "wage_arrears_status": result["wage_arrears"].status,
-        "insurance_default_status": result["insurance_default"].status,
-        "serious_accident_status": result["serious_accident"].status,
-    }
+    result = await Work24Client().check_wage_arrears(company)
 
     changed_fields: list[str] = []
-    if previous:
-        for field, value in current_values.items():
-            if getattr(previous, field) != value:
-                changed_fields.append(field)
-
-    errors = [
-        item.error_message
-        for item in result.values()
-        if item.error_message and item.status == "error"
-    ]
+    if previous and previous.wage_arrears_status != result.status:
+        changed_fields.append("wage_arrears_status")
 
     check = CheckResult(
         company_id=company.id,
-        **current_values,
-        changed_fields=json.dumps(changed_fields, ensure_ascii=False) if changed_fields else None,
-        error_message=" | ".join(errors) if errors else None,
+        wage_arrears_status=result.status,
+        changed_fields=(
+            json.dumps(changed_fields, ensure_ascii=False)
+            if changed_fields
+            else None
+        ),
+        error_message=result.error_message if result.status == "error" else None,
     )
     db.add(check)
     db.commit()
