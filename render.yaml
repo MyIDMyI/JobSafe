@@ -15,5 +15,3 @@ services:
         sync: false
       - key: WORK24_AUTH_KEY
         sync: false
-      - key: WORK24_SERIOUS_ACCIDENT_URL
-        sync: false
