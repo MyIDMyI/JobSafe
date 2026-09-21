@@ -11,16 +11,30 @@ class Company(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    business_registration_number: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    workplace_management_number: Mapped[str] = mapped_column(String(30), nullable=False)
-    job_posting_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    business_registration_number: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        index=True,
+    )
+    workplace_management_number: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+    )
+    job_posting_name: Mapped[str | None] = mapped_column(
+        String(200),
+        nullable=True,
+    )
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
 
     checks: Mapped[list["CheckResult"]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
-        order_by="desc(CheckResult.checked_at)",
+        order_by=lambda: CheckResult.checked_at.desc(),
     )
 
 
