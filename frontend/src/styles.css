@@ -158,6 +158,13 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(79, 116, 217, 0.12);
 }
 
+.form-help {
+  margin: 14px 0 0;
+  color: #788292;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .button {
   align-self: end;
   border: 0;
@@ -198,9 +205,12 @@ button:disabled {
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin: 18px 0;
+}
+
+.status-grid--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .status-grid > div {
@@ -208,7 +218,7 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  padding: 14px;
+  padding: 16px;
   background: #f7f9fc;
   border-radius: 12px;
   color: #4a5565;
@@ -245,6 +255,16 @@ button:disabled {
   color: #657080;
 }
 
+.inline-warning {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff8eb;
+  color: #8a5a00;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .company-card__footer {
   border-top: 1px solid #edf0f4;
   padding-top: 14px;
@@ -273,14 +293,18 @@ button:disabled {
 @media (max-width: 760px) {
   .hero,
   .summary-grid,
-  .company-form,
-  .status-grid {
+  .company-form {
     grid-template-columns: 1fr;
   }
 
   .company-card__head,
   .company-card__footer,
-  .panel__head {
+  .panel__head,
+  .status-grid > div {
     align-items: flex-start;
+  }
+
+  .status-grid > div {
+    flex-direction: column;
   }
 }
