@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./jobsafe.db"
     frontend_origins: str = "http://localhost:5173"
     work24_auth_key: str = ""
-    work24_serious_accident_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
