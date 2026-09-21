@@ -28,12 +28,22 @@ class CheckResult(Base):
     __tablename__ = "check_results"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
-    wage_arrears_status: Mapped[str] = mapped_column(String(20), default="not_checked")
-    insurance_default_status: Mapped[str] = mapped_column(String(20), default="not_checked")
-    serious_accident_status: Mapped[str] = mapped_column(String(20), default="not_checked")
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        index=True,
+    )
+    wage_arrears_status: Mapped[str] = mapped_column(
+        String(20),
+        default="not_checked",
+        nullable=False,
+    )
     changed_fields: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True,
+    )
 
     company: Mapped[Company] = relationship(back_populates="checks")
