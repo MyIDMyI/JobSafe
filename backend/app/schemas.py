@@ -10,7 +10,7 @@ def digits_only(value: str) -> str:
 class CompanyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     business_registration_number: str = Field(min_length=10, max_length=20)
-    workplace_management_number: str = Field(min_length=1, max_length=30)
+    workplace_management_number: str = Field(default="", max_length=30)
     job_posting_name: str | None = Field(default=None, max_length=200)
     memo: str | None = None
 
@@ -24,9 +24,10 @@ class CompanyCreate(BaseModel):
     @field_validator("workplace_management_number")
     @classmethod
     def validate_workplace_management_number(cls, value: str) -> str:
-        if not digits_only(value):
-            raise ValueError("사업장관리번호를 입력해 주세요.")
-        return value.strip()
+        value = value.strip()
+        if value and not digits_only(value):
+            raise ValueError("사업장관리번호는 숫자로 입력해 주세요.")
+        return value
 
 
 class CheckResultRead(BaseModel):
