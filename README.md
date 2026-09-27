@@ -28,12 +28,12 @@
 https://www.work24.go.kr/cm/openapi/app-form/sa-employ-improve-form-pay-back.do
 ```
 
-현재 구현에서 사용하는 필수 요청값:
+현재 구현에서 사용하는 요청값:
 
 - `authKey`: 발급받은 인증키
 - `returnType=XML`
 - `brno`: 사업자등록번호
-- `bzmn`: 사업장관리번호
+- `bzmn`: 사업장관리번호 (선택)
 
 주요 응답값:
 
