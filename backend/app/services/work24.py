@@ -18,7 +18,7 @@ class Work24Client:
 
     WAGE_ARREARS_URL = (
         "https://www.work24.go.kr"
-        "/cm/openapi/app-form/sa-employ-improve-form-pay-back.do"
+        "/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do"
     )
 
     def __init__(self) -> None:
