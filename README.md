@@ -25,7 +25,7 @@
 공식 요청 URL:
 
 ```text
-https://www.work24.go.kr/cm/openapi/app-form/sa-employ-improve-form-pay-back.do
+https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do
 ```
 
 현재 구현에서 사용하는 요청값:
