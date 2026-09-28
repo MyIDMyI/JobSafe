@@ -82,8 +82,12 @@ class Work24Client:
             "authKey": self.settings.work24_auth_key,
             "returnType": "XML",
             "brno": self._digits_only(company.business_registration_number),
-            "bzmn": self._digits_only(company.workplace_management_number),
         }
+
+        if company.workplace_management_number:
+            params["bzmn"] = self._digits_only(
+                company.workplace_management_number
+            )
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:

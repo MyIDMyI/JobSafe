@@ -212,7 +212,6 @@ function App() {
           <label>
             사업장관리번호
             <input
-              required
               value={form.workplace_management_number}
               onChange={(event) =>
                 setForm({
@@ -220,7 +219,7 @@ function App() {
                   workplace_management_number: event.target.value,
                 })
               }
-              placeholder="고용24 조회에 필요한 번호"
+              placeholder="선택 입력"
             />
           </label>
 
@@ -241,8 +240,7 @@ function App() {
         </form>
 
         <p className="form-help">
-          임금체불 명단공개 사업주 여부 API는 사업자등록번호와
-          사업장관리번호를 모두 사용해 조회합니다.
+          사업자등록번호는 필수이며, 사업장관리번호는 선택 입력입니다.
         </p>
 
         {message && <p className="error-message">{message}</p>}
