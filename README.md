@@ -2,21 +2,27 @@
 
 관심기업을 등록해 두면 고용24의 **임금체불 명단공개 사업주 여부**를 반복 점검하고, 이전 결과와 달라진 내용을 확인할 수 있도록 만든 구직자용 웹앱입니다.
 
-## 현재 MVP 범위
+## 현재 구현 상태
 
-현재 실제로 인증키를 발급받은 고용24 API만 사용합니다.
+- 관심기업 등록 / 목록 조회 / 삭제
+- 등록 직후 첫 점검 자동 실행
+- 고용24 임금체불 공개정보 조회
+- 점검 결과 PostgreSQL 저장
+- 이전 결과와 현재 결과 비교
+- 변경 발생 기업 강조 표시
+- 기업별 점검 이력 조회
+- 공공데이터 출처와 마지막 점검 시각 표시
+- 조회 실패와 `현재 공개정보 없음`을 명확히 구분
+- 중복 사업자등록번호 등록 방지
+- 배포용 자동 점검 API와 GitHub Actions 스케줄 워크플로 준비
 
-- 관심기업 등록 및 목록 관리
-- 임금체불 명단공개 사업주 여부 조회
-- 점검 결과 DB 저장
-- 이전 점검 결과와 현재 결과 비교
-- 결과가 달라졌을 때 변경사항 표시
-- 조회 실패와 미대상(N)을 구분해 표시
-- 이후 생성형 AI 설명 기능 추가 예정
+> `현재 공개정보 없음`은 현재 조회 기준으로 임금체불 명단공개 대상이 아니라는 뜻입니다. 해당 기업의 전체 근무환경이나 임금 지급 상태가 안전하다는 의미로 해석하지 않습니다.
 
-고용보험료 체납 사업주 여부와 중대재해 발표·공표 사업주 여부는 현재 사용할 수 있는 인증 권한을 확보하지 못했기 때문에 MVP에서 제외합니다. 추후 이용 가능해지면 확장 기능으로 추가할 수 있습니다.
+## MVP 범위
 
-> '미대상'은 현재 조회 기준으로 명단공개 대상이 아니라는 뜻입니다. 해당 기업의 전체 근무환경이나 임금 지급 상태를 보장하는 결과로 해석하지 않습니다.
+현재 실제로 이용 권한을 확보한 **고용24 임금체불 명단공개 사업주 여부 API** 하나만 사용합니다.
+
+고용보험료 체납 사업주 여부와 중대재해 발표·공표 사업주 여부는 현재 사용할 수 있는 인증 권한이 없어 MVP에서 제외했습니다. 추후 이용 권한을 확보하면 동일한 점검 구조에 추가할 수 있습니다.
 
 ## 사용 공공 API
 
@@ -28,7 +34,7 @@
 https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do
 ```
 
-현재 구현에서 사용하는 요청값:
+요청값:
 
 - `authKey`: 발급받은 인증키
 - `returnType=XML`
@@ -38,7 +44,7 @@ https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do
 주요 응답값:
 
 - `lnkSucsYn`: 연계 성공 여부
-- `judgReltYn`: Y=명단공개 대상, N=미대상
+- `judgReltYn`: `Y`=명단공개 대상, `N`=미대상
 - `errMsgCd`, `errMsg`: 오류 정보
 
 ## 기술 스택
@@ -47,7 +53,14 @@ https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do
 - Backend: FastAPI + SQLAlchemy
 - Database: SQLite(로컬 개발) / PostgreSQL(온라인 배포)
 - Public data: 고용24 OPEN API
-- Deployment target: Vercel + Render 계열 Python 호스팅 + PostgreSQL
+- Hosting: Render Static Site + Render Web Service + Render PostgreSQL
+- CI: GitHub Actions
+
+## 배포 주소
+
+- 웹앱: `https://jobsafe-web.onrender.com`
+- API: `https://jobsafe-api.onrender.com`
+- Health check: `https://jobsafe-api.onrender.com/health`
 
 ## 로컬 실행
 
@@ -68,8 +81,6 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-백엔드는 기본적으로 `http://localhost:8000`에서 실행됩니다.
-
 ### Frontend
 
 ```bash
@@ -78,8 +89,6 @@ npm install
 cp .env.example .env
 npm run dev
 ```
-
-프론트엔드는 기본적으로 `http://localhost:5173`에서 실행됩니다.
 
 ## 환경변수
 
@@ -90,33 +99,53 @@ APP_ENV=development
 DATABASE_URL=sqlite:///./jobsafe.db
 FRONTEND_ORIGINS=http://localhost:5173
 WORK24_AUTH_KEY=
+CRON_SECRET=
 ```
 
-- `DATABASE_URL`: 로컬은 SQLite, 배포 환경은 PostgreSQL URL 사용
+- `DATABASE_URL`: 로컬은 SQLite, 배포 환경은 PostgreSQL URL
 - `FRONTEND_ORIGINS`: 허용할 프론트엔드 주소
 - `WORK24_AUTH_KEY`: 발급받은 고용24 OPEN API 인증키
+- `CRON_SECRET`: 자동 점검 엔드포인트 호출용 비밀값
 
-실제 API 키는 절대로 GitHub에 커밋하지 않습니다. 로컬에서는 `.env`, 배포 환경에서는 호스팅 서비스의 Environment Variables에 등록합니다.
+실제 키와 비밀값은 GitHub에 커밋하지 않습니다.
 
 ### Frontend
 
 - `VITE_API_BASE_URL`: 배포된 FastAPI 서버 주소
 
+## 자동 점검
+
+백엔드에는 다음 자동 점검 엔드포인트가 준비되어 있습니다.
+
+```text
+POST /api/maintenance/run-checks
+X-Cron-Secret: <CRON_SECRET>
+```
+
+`.github/workflows/daily-check.yml`은 매일 **09:00 KST**에 이 엔드포인트를 호출하도록 작성되어 있습니다.
+
+실제 예약 실행을 활성화하려면:
+
+1. 워크플로 파일이 기본 브랜치(`main`)에 포함되어 있어야 합니다.
+2. Render `jobsafe-api`의 `CRON_SECRET`과 동일한 값을 GitHub Repository Secret `JOBSAFE_CRON_SECRET`에 등록합니다.
+3. GitHub Actions의 `JobSafe Daily Check`가 정상 실행되는지 확인합니다.
+
+Render 무료 Cron Job은 사용할 수 없어 GitHub Actions 스케줄 방식으로 준비했습니다.
+
 ## 구현 원칙
 
 1. 고용24가 반환한 원본 판정값을 임의로 바꾸지 않습니다.
-2. API 호출 실패를 '미대상'으로 처리하지 않습니다.
+2. API 호출 실패를 `현재 공개정보 없음`으로 처리하지 않습니다.
 3. 최초 점검은 변경사항으로 표시하지 않습니다.
 4. 두 번째 점검부터 이전 저장값과 비교합니다.
 5. 온라인 배포에서는 SQLite 대신 PostgreSQL을 사용합니다.
-6. 사용 권한이 없는 API를 임의로 호출하거나 추정 URL로 연결하지 않습니다.
+6. 사용 권한이 없는 API를 추정해서 호출하지 않습니다.
+7. `미대상` 결과를 기업의 안전성 보장으로 표현하지 않습니다.
 
-## 다음 단계
+## 현재 한계와 향후 확장
 
-1. 발급받은 `WORK24_AUTH_KEY`를 로컬 환경변수에 등록
-2. 실제 사업장 테스트 데이터로 고용24 API 호출 검증
-3. 응답 XML과 오류 케이스 확인
-4. 기업 상세 화면 및 검사 이력 화면 구현
-5. 생성형 AI 설명 기능 구현
-6. PostgreSQL 연결 후 온라인 배포
-
+- 현재는 로그인 없는 단일 사용자형 MVP라 공개 서비스에서 사용자별 관심기업 분리는 지원하지 않습니다.
+- 현재 위험정보 항목은 임금체불 공개정보 1종입니다.
+- 자동 점검 워크플로는 GitHub Secret 설정 후 활성화됩니다.
+- 추후 중대재해·고용보험 관련 공공데이터를 확보하면 점검 항목을 확장할 수 있습니다.
+- 이후 AI는 공공데이터 결과를 설명하는 역할로만 추가하고 기업의 안전/위험을 임의 평가하지 않도록 설계할 예정입니다.
