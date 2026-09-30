@@ -9,21 +9,21 @@ from bs4 import BeautifulSoup
 
 MOEL_DEFAULTER_URL = "https://www.moel.go.kr/info/defaulter/defaulterList.do"
 CACHE_TTL_SECONDS = 6 * 60 * 60
-ROWS_PER_PAGE = 10
+DEFAULT_ROWS_PER_PAGE = 10
 
 
 @dataclass(frozen=True)
 class DefaulterRecord:
-    disclosure_round: str
     representative_name: str
     age: str
     workplace_name: str
-    industry: str
     owner_address: str
     workplace_address: str
     arrears_amount: str
+    disclosure_round: str | None = None
+    industry: str | None = None
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, str | None]:
         return asdict(self)
 
 
@@ -39,34 +39,102 @@ def normalize_workplace_name(value: str) -> str:
     return text
 
 
+def _normalized_header(value: str) -> str:
+    return re.sub(r"\s+", "", value).replace("·", "")
+
+
 def parse_defaulter_page(html: str) -> list[DefaulterRecord]:
+    """Parse the public MOEL defaulter table without inventing unsupported fields.
+
+    The current MOEL table exposes six columns: name, age, workplace name,
+    owner address, workplace address, and arrears amount. A fallback for an
+    older eight-column layout is kept so the parser remains tolerant if the
+    ministry serves a legacy layout on some pages.
+    """
     soup = BeautifulSoup(html, "html.parser")
     rows: list[DefaulterRecord] = []
 
-    for tr in soup.select("table tbody tr"):
+    target_table = None
+    for table in soup.find_all("table"):
+        header_text = " ".join(table.stripped_strings)
+        if "사업장명" in header_text and "체불액" in header_text:
+            target_table = table
+            break
+
+    if target_table is None:
+        return rows
+
+    headers = [
+        _normalized_header(" ".join(cell.stripped_strings))
+        for cell in target_table.select("thead th")
+    ]
+    header_index = {header: index for index, header in enumerate(headers)}
+
+    def pick(cells: list[str], *names: str) -> str:
+        for name in names:
+            index = header_index.get(_normalized_header(name))
+            if index is not None and index < len(cells):
+                return cells[index]
+        return ""
+
+    for tr in target_table.select("tbody tr"):
         cells = [
             " ".join(td.stripped_strings).strip()
             for td in tr.find_all(["th", "td"])
         ]
-        if len(cells) < 8:
+        if not cells:
             continue
 
-        disclosure_round, representative_name, age, workplace_name, industry, owner_address, workplace_address, arrears_amount = cells[:8]
-        if not workplace_name or disclosure_round == "구분":
+        if headers:
+            representative_name = pick(cells, "성명")
+            age = pick(cells, "나이")
+            workplace_name = pick(cells, "사업장명", "사업장")
+            owner_address = pick(cells, "주소지(사업주)", "사업주주소")
+            workplace_address = pick(cells, "소재지(사업장)", "사업장소재지")
+            arrears_amount = pick(cells, "체불액(원)", "체불액")
+            disclosure_round = pick(cells, "구분") or None
+            industry = pick(cells, "업종") or None
+        elif len(cells) >= 8:
+            (
+                disclosure_round,
+                representative_name,
+                age,
+                workplace_name,
+                industry,
+                owner_address,
+                workplace_address,
+                arrears_amount,
+            ) = cells[:8]
+        elif len(cells) >= 6:
+            (
+                representative_name,
+                age,
+                workplace_name,
+                owner_address,
+                workplace_address,
+                arrears_amount,
+            ) = cells[:6]
+            disclosure_round = None
+            industry = None
+        else:
+            continue
+
+        if not workplace_name or not representative_name:
             continue
 
         rows.append(
             DefaulterRecord(
-                disclosure_round=disclosure_round,
                 representative_name=representative_name,
                 age=age,
                 workplace_name=workplace_name,
-                industry=industry,
                 owner_address=owner_address,
                 workplace_address=workplace_address,
                 arrears_amount=arrears_amount,
+                disclosure_round=disclosure_round,
+                industry=industry,
             )
         )
+
     return rows
 
 
@@ -102,7 +170,11 @@ async def fetch_all_defaulters() -> list[DefaulterRecord]:
         limits = httpx.Limits(max_connections=6, max_keepalive_connections=6)
         timeout = httpx.Timeout(15.0, connect=10.0)
 
-        async with httpx.AsyncClient(timeout=timeout, limits=limits, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            limits=limits,
+            follow_redirects=True,
+        ) as client:
             first_response = await client.get(
                 MOEL_DEFAULTER_URL,
                 params={"pageIndex": 1},
@@ -111,11 +183,15 @@ async def fetch_all_defaulters() -> list[DefaulterRecord]:
             first_response.raise_for_status()
 
             records = parse_defaulter_page(first_response.text)
+            if not records:
+                raise RuntimeError("고용노동부 공개명단 표 형식을 확인하지 못했습니다.")
+
             total_count = parse_total_count(first_response.text)
+            rows_per_page = len(records) or DEFAULT_ROWS_PER_PAGE
             total_pages = max(
                 1,
-                ((total_count or len(records)) + ROWS_PER_PAGE - 1)
-                // ROWS_PER_PAGE,
+                ((total_count or len(records)) + rows_per_page - 1)
+                // rows_per_page,
             )
 
             for start in range(2, total_pages + 1, 6):
@@ -141,15 +217,18 @@ async def find_defaulter_candidates(company_name: str) -> dict:
     normalized = normalize_workplace_name(company_name)
 
     exact = [
-        record for record in records
+        record
+        for record in records
         if normalize_workplace_name(record.workplace_name) == normalized
     ]
 
     return {
         "query_name": company_name,
         "match_status": (
-            "exact_unique" if len(exact) == 1
-            else "multiple" if len(exact) > 1
+            "exact_unique"
+            if len(exact) == 1
+            else "multiple"
+            if len(exact) > 1
             else "not_found"
         ),
         "candidate_count": len(exact),
