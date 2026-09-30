@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 
 const STATUS_LABELS = {
-  yes: "공개 위험정보 확인",
-  no: "현재 공개정보 없음",
+  yes: "임금체불 명단공개 대상",
+  no: "임금체불 명단공개 미대상",
   error: "조회 실패",
   not_checked: "미점검",
   not_configured: "API 키 설정 필요",
@@ -28,7 +28,7 @@ function StatusDescription({ value }) {
   if (value === "yes") {
     return (
       <p className="muted">
-        고용24의 임금체불 명단공개 사업주 조회에서 공개 대상으로 확인되었습니다.
+        고용24 OPEN API 판정값이 Y로 확인되어, 임금체불 명단공개 사업주 대상에 해당합니다.
       </p>
     );
   }
@@ -36,7 +36,7 @@ function StatusDescription({ value }) {
   if (value === "no") {
     return (
       <p className="muted">
-        현재 조회 기준으로 임금체불 명단공개 대상에 해당하지 않습니다. 임금체불이 전혀 없다는 의미는 아닙니다.
+        고용24 OPEN API 판정값이 N으로 확인되어, 현재 임금체불 명단공개 사업주 대상에는 해당하지 않습니다. 임금체불이 전혀 없다는 의미는 아닙니다.
       </p>
     );
   }
@@ -96,7 +96,7 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
 
       <div className="status-grid status-grid--single">
         <div>
-          <span>임금체불 공개정보</span>
+          <span>고용24 임금체불 명단공개 사업주 여부</span>
           <StatusBadge value={check?.wage_arrears_status} />
         </div>
       </div>
