@@ -241,7 +241,7 @@ function App() {
           <h1>JobSafe</h1>
           <p>
             관심기업을 등록하면 공공데이터를 바탕으로 구직 시 참고할 위험정보를
-            자동으로 반복 점검하고, 이전 결과와 달라진 내용이 있는지 관리합니다.
+            반복 점검하고, 이전 결과와 달라진 내용이 있는지 관리합니다.
           </p>
         </div>
 
@@ -272,7 +272,7 @@ function App() {
         </div>
         <div className="summary-card">
           <span>자동 점검</span>
-          <strong>{loading ? "확인 중" : "매일 실행"}</strong>
+          <strong>{loading ? "확인 중" : "연동 준비"}</strong>
         </div>
       </section>
 
@@ -343,7 +343,7 @@ function App() {
         </form>
 
         <p className="form-help">
-          사업자등록번호는 필수이며, 사업장관리번호는 선택 입력입니다. 등록 직후 첫 점검을 실행하고 이후에는 자동 점검 이력을 누적합니다.
+          사업자등록번호는 필수이며, 사업장관리번호는 선택 입력입니다. 등록 직후 첫 점검을 실행하고 점검 결과와 이력을 저장합니다.
         </p>
 
         {message && <p className="error-message">{message}</p>}
