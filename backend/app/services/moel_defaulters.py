@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 MOEL_DEFAULTER_URL = "https://www.moel.go.kr/info/defaulter/defaulterList.do"
 CACHE_TTL_SECONDS = 6 * 60 * 60
-MAX_PAGES = 64
+ROWS_PER_PAGE = 10
 
 
 @dataclass(frozen=True)
@@ -80,6 +80,13 @@ async def _fetch_page(client: httpx.AsyncClient, page: int) -> list[DefaulterRec
     return parse_defaulter_page(response.text)
 
 
+def parse_total_count(html: str) -> int | None:
+    soup = BeautifulSoup(html, "html.parser")
+    text = " ".join(soup.stripped_strings)
+    match = re.search(r"전체\s*([0-9,]+)", text)
+    return int(match.group(1).replace(",", "")) if match else None
+
+
 async def fetch_all_defaulters() -> list[DefaulterRecord]:
     global _cache
 
@@ -92,13 +99,27 @@ async def fetch_all_defaulters() -> list[DefaulterRecord]:
         if _cache and now - _cache[0] < CACHE_TTL_SECONDS:
             return _cache[1]
 
-        records: list[DefaulterRecord] = []
         limits = httpx.Limits(max_connections=6, max_keepalive_connections=6)
         timeout = httpx.Timeout(15.0, connect=10.0)
 
         async with httpx.AsyncClient(timeout=timeout, limits=limits, follow_redirects=True) as client:
-            for start in range(1, MAX_PAGES + 1, 6):
-                pages = range(start, min(start + 6, MAX_PAGES + 1))
+            first_response = await client.get(
+                MOEL_DEFAULTER_URL,
+                params={"pageIndex": 1},
+                headers={"User-Agent": "JobSafe/1.0 (+public-data class project)"},
+            )
+            first_response.raise_for_status()
+
+            records = parse_defaulter_page(first_response.text)
+            total_count = parse_total_count(first_response.text)
+            total_pages = max(
+                1,
+                ((total_count or len(records)) + ROWS_PER_PAGE - 1)
+                // ROWS_PER_PAGE,
+            )
+
+            for start in range(2, total_pages + 1, 6):
+                pages = range(start, min(start + 6, total_pages + 1))
                 batches = await asyncio.gather(
                     *(_fetch_page(client, page) for page in pages),
                     return_exceptions=True,
