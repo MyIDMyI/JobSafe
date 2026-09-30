@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 
 const STATUS_LABELS = {
-  yes: "명단공개 대상",
-  no: "명단공개 미대상",
+  yes: "공개 위험정보 확인",
+  no: "현재 공개정보 없음",
   error: "조회 실패",
-  not_checked: "미조회",
+  not_checked: "미점검",
   not_configured: "API 키 설정 필요",
 };
 
@@ -22,6 +22,30 @@ function StatusBadge({ value }) {
       {STATUS_LABELS[normalized] || normalized}
     </span>
   );
+}
+
+function StatusDescription({ value }) {
+  if (value === "yes") {
+    return (
+      <p className="muted">
+        고용24의 임금체불 명단공개 사업주 조회에서 공개 대상으로 확인되었습니다.
+      </p>
+    );
+  }
+
+  if (value === "no") {
+    return (
+      <p className="muted">
+        현재 조회 기준으로 임금체불 명단공개 대상에 해당하지 않습니다. 임금체불이 전혀 없다는 의미는 아닙니다.
+      </p>
+    );
+  }
+
+  if (value === "error") {
+    return <p className="muted">공공데이터 조회에 실패했습니다. 오류 내용을 확인해 주세요.</p>;
+  }
+
+  return <p className="muted">아직 공공 위험정보 점검을 실행하지 않았습니다.</p>;
 }
 
 function CompanyCard({ company, onCheck, checking }) {
@@ -48,10 +72,12 @@ function CompanyCard({ company, onCheck, checking }) {
 
       <div className="status-grid status-grid--single">
         <div>
-          <span>임금체불 명단공개 사업주 여부</span>
+          <span>임금체불 공개정보</span>
           <StatusBadge value={check?.wage_arrears_status} />
         </div>
       </div>
+
+      <StatusDescription value={check?.wage_arrears_status} />
 
       {check?.error_message && (
         <p className="inline-warning">{check.error_message}</p>
@@ -64,7 +90,7 @@ function CompanyCard({ company, onCheck, checking }) {
             ? new Date(check.checked_at).toLocaleString("ko-KR")
             : "아직 없음"}
         </span>
-        {check?.changed_fields && <strong>이전 점검과 결과가 달라졌습니다.</strong>}
+        {check?.changed_fields && <strong>공개 위험정보 상태가 이전 점검과 달라졌습니다.</strong>}
       </div>
     </article>
   );
@@ -144,16 +170,16 @@ function App() {
           <p className="eyebrow">공공데이터 기반 구직 지원</p>
           <h1>JobSafe</h1>
           <p>
-            관심기업을 등록해 고용24의 임금체불 명단공개 사업주 여부를
-            반복해서 확인하고, 이전 점검과 달라진 내용이 있는지 관리합니다.
+            관심기업을 등록하면 공공데이터를 바탕으로 구직 시 참고할 위험정보를
+            반복해서 점검하고, 이전 결과와 달라진 내용이 있는지 관리합니다.
           </p>
         </div>
 
         <div className="hero__notice">
-          <strong>꼭 확인해 주세요</strong>
+          <strong>현재 점검 항목</strong>
           <span>
-            '미대상'은 현재 조회 기준으로 명단공개 대상이 아니라는 뜻이며,
-            기업의 전체 근무환경이나 임금 지급 상태를 보장하는 결과는 아닙니다.
+            현재 MVP는 고용24의 임금체불 명단공개 정보를 활용합니다.
+            '현재 공개정보 없음'은 기업의 전체 근무환경이나 임금 지급 상태가 안전하다는 뜻이 아닙니다.
           </span>
         </div>
       </header>
@@ -164,12 +190,12 @@ function App() {
           <strong>{companies.length}</strong>
         </div>
         <div className="summary-card">
-          <span>결과 변경</span>
+          <span>위험정보 변경</span>
           <strong>{changedCount}</strong>
         </div>
         <div className="summary-card">
           <span>화면 상태</span>
-          <strong>{loading ? "불러오는 중" : "준비됨"}</strong>
+          <strong>{loading ? "불러오는 중" : "점검 가능"}</strong>
         </div>
       </section>
 
@@ -249,7 +275,7 @@ function App() {
       <section className="panel">
         <div className="panel__head">
           <div>
-            <p className="eyebrow">반복 점검 대상</p>
+            <p className="eyebrow">공공 위험정보 점검</p>
             <h2>관심기업 목록</h2>
           </div>
           <button className="button button--ghost" onClick={loadCompanies}>
