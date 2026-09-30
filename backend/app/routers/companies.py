@@ -6,6 +6,7 @@ from ..database import get_db
 from ..models import Company
 from ..schemas import CompanyCreate, CompanyRead
 from ..services.checks import run_company_check
+from ..services.moel_defaulters import find_defaulter_candidates
 
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
@@ -70,3 +71,23 @@ async def run_check(company_id: int, db: Session = Depends(get_db)):
     company = _get_company_or_404(db, company_id)
     await run_company_check(db, company)
     return _get_company_or_404(db, company_id)
+
+
+@router.get("/{company_id}/defaulter-details")
+async def get_defaulter_details(company_id: int, db: Session = Depends(get_db)):
+    company = _get_company_or_404(db, company_id)
+    latest = company.checks[0] if company.checks else None
+
+    if not latest or latest.wage_arrears_status != "yes":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="고용24에서 임금체불 명단공개 대상으로 확인된 기업만 상세명단을 조회할 수 있습니다.",
+        )
+
+    try:
+        return await find_defaulter_candidates(company.name)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="고용노동부 공개명단 상세정보를 불러오지 못했습니다.",
+        )
