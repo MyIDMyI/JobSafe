@@ -50,8 +50,23 @@ function StatusDescription({ value }) {
 
 function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [detailError, setDetailError] = useState("");
   const check = latestCheck(company);
   const hasChange = Boolean(check?.changed_fields);
+
+  async function loadDefaulterDetails() {
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      setDetailData(await api.getDefaulterDetails(company.id));
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   return (
     <article className={`company-card ${hasChange ? "company-card--changed" : ""}`}>
@@ -102,6 +117,63 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
       </div>
 
       <StatusDescription value={check?.wage_arrears_status} />
+
+      {check?.wage_arrears_status === "yes" && (
+        <div className="detail-actions">
+          <button
+            className="button button--detail"
+            onClick={loadDefaulterDetails}
+            disabled={detailLoading}
+          >
+            {detailLoading ? "공식 명단 조회 중..." : "고용노동부 상세 공개정보 조회"}
+          </button>
+          <span>사업장명이 일치하는 고용노동부 공개명단 후보를 확인합니다.</span>
+        </div>
+      )}
+
+      {detailError && <p className="inline-warning">{detailError}</p>}
+
+      {detailData && (
+        <div className="defaulter-panel">
+          <div className="defaulter-panel__head">
+            <div>
+              <p className="eyebrow">고용노동부 체불사업주 명단공개</p>
+              <h4>상세 공개정보 후보</h4>
+            </div>
+            <strong>
+              {detailData.match_status === "exact_unique"
+                ? "사업장명 일치 1건"
+                : detailData.match_status === "multiple"
+                  ? `동일 사업장명 ${detailData.candidate_count}건`
+                  : "일치 후보 없음"}
+            </strong>
+          </div>
+
+          {detailData.candidates?.map((item, index) => (
+            <div className="defaulter-detail" key={`${item.representative_name}-${index}`}>
+              <dl>
+                <div><dt>공개 구분</dt><dd>{item.disclosure_round}</dd></div>
+                <div><dt>성명</dt><dd>{item.representative_name}</dd></div>
+                <div><dt>나이</dt><dd>{item.age}</dd></div>
+                <div><dt>사업장명</dt><dd>{item.workplace_name}</dd></div>
+                <div><dt>업종</dt><dd>{item.industry}</dd></div>
+                <div><dt>사업장 소재지</dt><dd>{item.workplace_address}</dd></div>
+                <div><dt>사업주 주소지</dt><dd>{item.owner_address}</dd></div>
+                <div><dt>체불액</dt><dd>{item.arrears_amount}원</dd></div>
+              </dl>
+            </div>
+          ))}
+
+          {detailData.match_status === "not_found" && (
+            <p className="muted">
+              현재 공개명단에서 등록된 기업명과 동일한 사업장명을 찾지 못했습니다.
+            </p>
+          )}
+
+          <p className="identity-note">{detailData.identity_note}</p>
+          <p className="source-note">출처: 고용노동부 체불사업주 명단공개</p>
+        </div>
+      )}
 
       {check?.error_message && (
         <p className="inline-warning">{check.error_message}</p>
