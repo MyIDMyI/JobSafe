@@ -57,6 +57,7 @@ export const api = {
     request(`/api/companies/${id}/checks`, {
       method: "POST",
     }),
+  getDefaulterDetails: (id) => request(`/api/companies/${id}/defaulter-details`),
   deleteCompany: (id) =>
     request(`/api/companies/${id}`, {
       method: "DELETE",
