@@ -1,13 +1,11 @@
-import json
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import CheckResult, Company
+from ..models import Company
 from ..schemas import CompanyCreate, CompanyRead
-from ..services.work24 import Work24Client
+from ..services.checks import run_company_check
 
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
@@ -37,6 +35,18 @@ def list_companies(db: Session = Depends(get_db)):
 
 @router.post("", response_model=CompanyRead, status_code=status.HTTP_201_CREATED)
 def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
+    duplicate = db.scalar(
+        select(Company).where(
+            Company.business_registration_number
+            == payload.business_registration_number
+        )
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 사업자등록번호입니다.",
+        )
+
     company = Company(**payload.model_dump())
     db.add(company)
     db.commit()
@@ -58,25 +68,5 @@ def delete_company(company_id: int, db: Session = Depends(get_db)):
 @router.post("/{company_id}/checks", response_model=CompanyRead)
 async def run_check(company_id: int, db: Session = Depends(get_db)):
     company = _get_company_or_404(db, company_id)
-    previous = company.checks[0] if company.checks else None
-
-    result = await Work24Client().check_wage_arrears(company)
-
-    changed_fields: list[str] = []
-    if previous and previous.wage_arrears_status != result.status:
-        changed_fields.append("wage_arrears_status")
-
-    check = CheckResult(
-        company_id=company.id,
-        wage_arrears_status=result.status,
-        changed_fields=(
-            json.dumps(changed_fields, ensure_ascii=False)
-            if changed_fields
-            else None
-        ),
-        error_message=result.error_message if result.status == "error" else None,
-    )
-    db.add(check)
-    db.commit()
-
+    await run_company_check(db, company)
     return _get_company_or_404(db, company_id)
