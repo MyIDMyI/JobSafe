@@ -45,6 +45,10 @@ function StatusDescription({ value }) {
     return <p className="muted">공공데이터 조회에 실패했습니다. 오류 내용을 확인해 주세요.</p>;
   }
 
+  if (value === "not_configured") {
+    return <p className="muted">고용24 OPEN API 인증키가 설정되지 않았습니다.</p>;
+  }
+
   return <p className="muted">아직 공공 위험정보 점검을 실행하지 않았습니다.</p>;
 }
 
@@ -62,6 +66,7 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
     try {
       setDetailData(await api.getDefaulterDetails(company.id));
     } catch (error) {
+      setDetailData(null);
       setDetailError(error.message);
     } finally {
       setDetailLoading(false);
@@ -152,11 +157,15 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
           {detailData.candidates?.map((item, index) => (
             <div className="defaulter-detail" key={`${item.representative_name}-${index}`}>
               <dl>
-                <div><dt>공개 구분</dt><dd>{item.disclosure_round}</dd></div>
+                {item.disclosure_round && (
+                  <div><dt>공개 구분</dt><dd>{item.disclosure_round}</dd></div>
+                )}
                 <div><dt>성명</dt><dd>{item.representative_name}</dd></div>
                 <div><dt>나이</dt><dd>{item.age}</dd></div>
                 <div><dt>사업장명</dt><dd>{item.workplace_name}</dd></div>
-                <div><dt>업종</dt><dd>{item.industry}</dd></div>
+                {item.industry && (
+                  <div><dt>업종</dt><dd>{item.industry}</dd></div>
+                )}
                 <div><dt>사업장 소재지</dt><dd>{item.workplace_address}</dd></div>
                 <div><dt>사업주 주소지</dt><dd>{item.owner_address}</dd></div>
                 <div><dt>체불액</dt><dd>{item.arrears_amount}원</dd></div>
@@ -171,7 +180,9 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
           )}
 
           <p className="identity-note">{detailData.identity_note}</p>
-          <p className="source-note">출처: 고용노동부 체불사업주 명단공개</p>
+          <p className="source-note">
+            출처: 고용노동부 체불사업주 명단공개 · 화면에는 공식 명단에 실제 공개된 항목만 표시합니다.
+          </p>
         </div>
       )}
 
@@ -320,8 +331,8 @@ function App() {
         <div className="hero__notice">
           <strong>현재 점검 항목</strong>
           <span>
-            현재 MVP는 고용24의 임금체불 명단공개 정보를 활용합니다.
-            '현재 공개정보 없음'은 기업의 전체 근무환경이나 임금 지급 상태가 안전하다는 뜻이 아닙니다.
+            현재 MVP는 고용24의 임금체불 명단공개 여부를 조회하고, 대상 기업은 고용노동부 공식 공개명단의 상세정보 후보까지 확인합니다.
+            미대상 결과가 기업의 전체 근무환경이나 임금 지급 상태가 안전하다는 뜻은 아닙니다.
           </span>
         </div>
       </header>
