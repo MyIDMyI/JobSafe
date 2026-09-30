@@ -1,12 +1,11 @@
-import json
-
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import get_settings
 from ..database import get_db
-from ..models import CheckResult, Company
+from ..models import Company
+from ..services.checks import run_company_check
 from ..services.work24 import Work24Client
 
 
@@ -35,35 +34,12 @@ async def run_all_checks(
     failed = 0
 
     for company in companies:
-        previous = company.checks[0] if company.checks else None
-        result = await client.check_wage_arrears(company)
-
-        changed_fields: list[str] = []
-        if previous and previous.wage_arrears_status != result.status:
-            changed_fields.append("wage_arrears_status")
-            changed += 1
-
-        if result.status == "error":
-            failed += 1
-
-        db.add(
-            CheckResult(
-                company_id=company.id,
-                wage_arrears_status=result.status,
-                changed_fields=(
-                    json.dumps(changed_fields, ensure_ascii=False)
-                    if changed_fields
-                    else None
-                ),
-                error_message=(
-                    result.error_message
-                    if result.status in {"error", "not_configured"}
-                    else None
-                ),
-            )
-        )
-        db.commit()
+        check = await run_company_check(db, company, client=client)
         checked += 1
+        if check.changed_fields:
+            changed += 1
+        if check.wage_arrears_status in {"error", "not_configured"}:
+            failed += 1
 
     return {
         "checked": checked,
