@@ -10,7 +10,6 @@ class Company(Base):
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    owner_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     business_registration_number: Mapped[str] = mapped_column(
         String(20),
@@ -62,3 +61,16 @@ class CheckResult(Base):
     )
 
     company: Mapped[Company] = relationship(back_populates="checks")
+
+
+class ClientCompany(Base):
+    __tablename__ = "client_companies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    owner_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
