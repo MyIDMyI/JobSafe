@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,10 +15,28 @@ from ..services.moel_defaulters import find_defaulter_candidates
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
 
-def _get_company_or_404(db: Session, company_id: int) -> Company:
+def get_client_id(
+    x_client_id: Annotated[str | None, Header(alias="X-Client-Id")] = None,
+) -> str:
+    if not x_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="브라우저 식별정보가 없습니다. 페이지를 새로고침해 주세요.",
+        )
+
+    try:
+        return str(UUID(x_client_id.strip()))
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="브라우저 식별정보가 올바르지 않습니다.",
+        )
+
+
+def _get_company_or_404(db: Session, company_id: int, owner_key: str) -> Company:
     stmt = (
         select(Company)
-        .where(Company.id == company_id)
+        .where(Company.id == company_id, Company.owner_key == owner_key)
         .options(selectinload(Company.checks))
     )
     company = db.scalar(stmt)
@@ -25,9 +46,13 @@ def _get_company_or_404(db: Session, company_id: int) -> Company:
 
 
 @router.get("", response_model=list[CompanyRead])
-def list_companies(db: Session = Depends(get_db)):
+def list_companies(
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
     stmt = (
         select(Company)
+        .where(Company.owner_key == owner_key)
         .options(selectinload(Company.checks))
         .order_by(Company.id.desc())
     )
@@ -35,11 +60,16 @@ def list_companies(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=CompanyRead, status_code=status.HTTP_201_CREATED)
-def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
+def create_company(
+    payload: CompanyCreate,
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
     duplicate = db.scalar(
         select(Company).where(
+            Company.owner_key == owner_key,
             Company.business_registration_number
-            == payload.business_registration_number
+            == payload.business_registration_number,
         )
     )
     if duplicate:
@@ -48,34 +78,50 @@ def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
             detail="이미 등록된 사업자등록번호입니다.",
         )
 
-    company = Company(**payload.model_dump())
+    company = Company(owner_key=owner_key, **payload.model_dump())
     db.add(company)
     db.commit()
-    return _get_company_or_404(db, company.id)
+    return _get_company_or_404(db, company.id, owner_key)
 
 
 @router.get("/{company_id}", response_model=CompanyRead)
-def get_company(company_id: int, db: Session = Depends(get_db)):
-    return _get_company_or_404(db, company_id)
+def get_company(
+    company_id: int,
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
+    return _get_company_or_404(db, company_id, owner_key)
 
 
 @router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_company(company_id: int, db: Session = Depends(get_db)):
-    company = _get_company_or_404(db, company_id)
+def delete_company(
+    company_id: int,
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
+    company = _get_company_or_404(db, company_id, owner_key)
     db.delete(company)
     db.commit()
 
 
 @router.post("/{company_id}/checks", response_model=CompanyRead)
-async def run_check(company_id: int, db: Session = Depends(get_db)):
-    company = _get_company_or_404(db, company_id)
+async def run_check(
+    company_id: int,
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
+    company = _get_company_or_404(db, company_id, owner_key)
     await run_company_check(db, company)
-    return _get_company_or_404(db, company_id)
+    return _get_company_or_404(db, company_id, owner_key)
 
 
 @router.get("/{company_id}/defaulter-details")
-async def get_defaulter_details(company_id: int, db: Session = Depends(get_db)):
-    company = _get_company_or_404(db, company_id)
+async def get_defaulter_details(
+    company_id: int,
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
+    company = _get_company_or_404(db, company_id, owner_key)
     latest = company.checks[0] if company.checks else None
 
     if not latest or latest.wage_arrears_status != "yes":
