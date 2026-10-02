@@ -1182,3 +1182,84 @@ button:disabled {
     font-size: 19px;
   }
 }
+
+
+.settings-action {
+  flex: 0 0 auto;
+}
+
+.settings-select {
+  min-width: 160px;
+  border: 1px solid #cfd6e2;
+  border-radius: 11px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #263244;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+}
+
+.settings-select:focus {
+  border-color: #4f74d9;
+  box-shadow: 0 0 0 3px rgba(79, 116, 217, 0.12);
+}
+
+.setting-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.setting-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.setting-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #d6dce5;
+  transition: background 160ms ease;
+}
+
+.setting-switch span::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(24, 33, 47, 0.2);
+  transition: transform 160ms ease;
+}
+
+.setting-switch input:checked + span {
+  background: #315fc8;
+}
+
+.setting-switch input:checked + span::after {
+  transform: translateX(20px);
+}
+
+.setting-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(79, 116, 217, 0.18);
+}
+
+@media (max-width: 760px) {
+  .settings-action,
+  .settings-select {
+    width: 100%;
+  }
+
+  .settings-select {
+    min-height: 44px;
+  }
+}
