@@ -1,4 +1,15 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const CLIENT_ID_STORAGE_KEY = "jobsafe_client_id";
+
+function getClientId() {
+  let clientId = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(CLIENT_ID_STORAGE_KEY, clientId);
+  }
+  return clientId;
+}
+
 
 const FIELD_LABELS = {
   name: "기업명",
@@ -29,6 +40,7 @@ async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      "X-Client-Id": getClientId(),
       ...(options.headers || {}),
     },
     ...options,
