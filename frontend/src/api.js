@@ -61,6 +61,7 @@ async function request(path, options = {}) {
 export const api = {
   searchCompanies: (query) => request(`/api/company-search?q=${encodeURIComponent(query)}`),
   listCompanies: () => request("/api/companies"),
+  refreshAllCompanies: () => request("/api/companies/refresh-all", { method: "POST" }),
   createCompany: (payload) =>
     request("/api/companies", {
       method: "POST",
