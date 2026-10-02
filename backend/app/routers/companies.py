@@ -90,6 +90,42 @@ def create_company(
     return _get_company_or_404(db, company.id, owner_key)
 
 
+@router.post("/refresh-all")
+async def refresh_all_companies(
+    owner_key: str = Depends(get_client_id),
+    db: Session = Depends(get_db),
+):
+    stmt = (
+        select(Company)
+        .join(ClientCompany, ClientCompany.company_id == Company.id)
+        .where(ClientCompany.owner_key == owner_key)
+        .options(selectinload(Company.checks))
+        .order_by(Company.id.desc())
+    )
+    companies = list(db.scalars(stmt).unique().all())
+
+    checked = 0
+    changed = 0
+    failed = 0
+
+    for company in companies:
+        previous = company.checks[0].wage_arrears_status if company.checks else None
+        result = await run_company_check(db, company)
+        checked += 1
+
+        if result.wage_arrears_status in {"error", "not_configured"}:
+            failed += 1
+
+        if previous is not None and result.wage_arrears_status != previous:
+            changed += 1
+
+    return {
+        "checked": checked,
+        "changed": changed,
+        "failed": failed,
+    }
+
+
 @router.get("/{company_id}", response_model=CompanyRead)
 def get_company(
     company_id: int,
