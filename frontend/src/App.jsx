@@ -227,6 +227,8 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
 function App() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [autoRefreshing, setAutoRefreshing] = useState(true);
+  const [autoRefreshSummary, setAutoRefreshSummary] = useState(null);
   const [checkingId, setCheckingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [message, setMessage] = useState("");
@@ -262,7 +264,33 @@ function App() {
   }
 
   useEffect(() => {
-    loadCompanies();
+    let cancelled = false;
+
+    async function refreshOnEntry() {
+      setAutoRefreshing(true);
+      try {
+        await loadCompanies();
+        const summary = await api.refreshAllCompanies();
+        if (!cancelled) {
+          setAutoRefreshSummary(summary);
+          await loadCompanies();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMessage(error.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setAutoRefreshing(false);
+        }
+      }
+    }
+
+    refreshOnEntry();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleCompanySearch(event) {
@@ -399,7 +427,7 @@ function App() {
               </button>
               <div className="summary-card">
                 <span>자동 점검</span>
-                <strong>{loading ? "확인 중" : "연동 준비"}</strong>
+                <strong>{autoRefreshing ? "점검 중" : "완료"}</strong>
               </div>
             </section>
 
@@ -616,9 +644,16 @@ function App() {
               <div className="settings-item">
                 <div>
                   <strong>자동 점검 및 알림</strong>
-                  <p>주기 설정과 변경 알림 기능은 다음 단계에서 연결할 수 있습니다.</p>
+                  <p>사이트에 접속하면 이 브라우저에 등록된 관심기업 전체를 자동으로 다시 점검합니다.</p>
+                  {autoRefreshSummary && (
+                    <p>
+                      최근 자동점검: {autoRefreshSummary.checked}개 점검 · 변경 {autoRefreshSummary.changed}개 · 실패 {autoRefreshSummary.failed}개
+                    </p>
+                  )}
                 </div>
-                <span className="settings-chip">준비 중</span>
+                <span className="settings-chip settings-chip--active">
+                  {autoRefreshing ? "점검 중" : "사용 중"}
+                </span>
               </div>
             </section>
           </div>
