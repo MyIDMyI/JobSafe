@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import Company
+from ..models import ClientCompany, Company
 from ..schemas import CompanyCreate, CompanyRead
 from ..services.checks import run_company_check
 from ..services.moel_defaulters import find_defaulter_candidates
@@ -36,7 +36,8 @@ def get_client_id(
 def _get_company_or_404(db: Session, company_id: int, owner_key: str) -> Company:
     stmt = (
         select(Company)
-        .where(Company.id == company_id, Company.owner_key == owner_key)
+        .join(ClientCompany, ClientCompany.company_id == Company.id)
+        .where(Company.id == company_id, ClientCompany.owner_key == owner_key)
         .options(selectinload(Company.checks))
     )
     company = db.scalar(stmt)
@@ -52,7 +53,8 @@ def list_companies(
 ):
     stmt = (
         select(Company)
-        .where(Company.owner_key == owner_key)
+        .join(ClientCompany, ClientCompany.company_id == Company.id)
+        .where(ClientCompany.owner_key == owner_key)
         .options(selectinload(Company.checks))
         .order_by(Company.id.desc())
     )
@@ -66,8 +68,10 @@ def create_company(
     db: Session = Depends(get_db),
 ):
     duplicate = db.scalar(
-        select(Company).where(
-            Company.owner_key == owner_key,
+        select(Company)
+        .join(ClientCompany, ClientCompany.company_id == Company.id)
+        .where(
+            ClientCompany.owner_key == owner_key,
             Company.business_registration_number
             == payload.business_registration_number,
         )
@@ -78,8 +82,10 @@ def create_company(
             detail="이미 등록된 사업자등록번호입니다.",
         )
 
-    company = Company(owner_key=owner_key, **payload.model_dump())
+    company = Company(**payload.model_dump())
     db.add(company)
+    db.flush()
+    db.add(ClientCompany(owner_key=owner_key, company_id=company.id))
     db.commit()
     return _get_company_or_404(db, company.id, owner_key)
 
