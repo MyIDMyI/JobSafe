@@ -419,7 +419,7 @@ function App() {
           </form>
 
           <p className="form-help">
-            OpenDART에 등록된 기업을 이름 일부로 검색합니다. 결과의 정식 기업명, 사업자등록번호, 주소와 홈페이지를 확인한 뒤 선택할 수 있습니다.
+            OpenDART에 등록된 기업을 이름 일부로 검색합니다. 결과의 정식 기업명, 사업자등록번호, 대표자와 주소를 확인한 뒤 선택할 수 있습니다.
           </p>
 
           {searchError && <p className="error-message">{searchError}</p>}
@@ -452,18 +452,6 @@ function App() {
                         <div>
                           <dt>주소</dt>
                           <dd>{item.address || "정보 없음"}</dd>
-                        </div>
-                        <div>
-                          <dt>홈페이지</dt>
-                          <dd>
-                            {item.homepage ? (
-                              <a href={item.homepage.startsWith("http") ? item.homepage : `https://${item.homepage}`} target="_blank" rel="noreferrer">
-                                {item.homepage}
-                              </a>
-                            ) : (
-                              "정보 없음"
-                            )}
-                          </dd>
                         </div>
                       </dl>
                     </div>
