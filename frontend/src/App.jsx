@@ -230,6 +230,10 @@ function App() {
   const [checkingId, setCheckingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [message, setMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchData, setSearchData] = useState(null);
+  const [searchError, setSearchError] = useState("");
   const [form, setForm] = useState({
     name: "",
     business_registration_number: "",
@@ -259,6 +263,40 @@ function App() {
   useEffect(() => {
     loadCompanies();
   }, []);
+
+  async function handleCompanySearch(event) {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchError("기업명은 2글자 이상 입력해 주세요.");
+      return;
+    }
+
+    setSearching(true);
+    setSearchError("");
+    try {
+      setSearchData(await api.searchCompanies(query));
+    } catch (error) {
+      setSearchData(null);
+      setSearchError(error.message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function selectSearchResult(item) {
+    if (!item.can_register) return;
+    setForm((current) => ({
+      ...current,
+      name: item.company_name,
+      business_registration_number: item.business_registration_number,
+    }));
+    setMessage("");
+    document.getElementById("company-registration-form")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -367,7 +405,88 @@ function App() {
           </div>
         </div>
 
-        <form className="company-form" onSubmit={handleSubmit}>
+        <div className="company-search">
+          <form className="company-search__bar" onSubmit={handleCompanySearch}>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="기업명 일부 입력 (예: 삼성, 카카오)"
+              aria-label="기업 검색"
+            />
+            <button className="button button--secondary" type="submit" disabled={searching}>
+              {searching ? "검색 중..." : "기업 검색"}
+            </button>
+          </form>
+
+          <p className="form-help">
+            OpenDART에 등록된 기업을 이름 일부로 검색합니다. 결과의 정식 기업명, 사업자등록번호, 주소와 홈페이지를 확인한 뒤 선택할 수 있습니다.
+          </p>
+
+          {searchError && <p className="error-message">{searchError}</p>}
+
+          {searchData?.status === "not_configured" && (
+            <p className="inline-warning">
+              기업 검색 기능을 사용하려면 서버에 OpenDART 인증키를 설정해야 합니다.
+            </p>
+          )}
+
+          {searchData?.status === "ok" && (
+            <div className="company-search__results">
+              {searchData.results?.length ? (
+                searchData.results.map((item) => (
+                  <article className="company-search__item" key={item.corp_code}>
+                    <div className="company-search__info">
+                      <div className="company-search__title">
+                        <strong>{item.company_name}</strong>
+                        {item.stock_code && <span>{item.stock_code}</span>}
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>사업자등록번호</dt>
+                          <dd>{item.business_registration_number || "정보 없음"}</dd>
+                        </div>
+                        <div>
+                          <dt>대표자</dt>
+                          <dd>{item.ceo_name || "정보 없음"}</dd>
+                        </div>
+                        <div>
+                          <dt>주소</dt>
+                          <dd>{item.address || "정보 없음"}</dd>
+                        </div>
+                        <div>
+                          <dt>홈페이지</dt>
+                          <dd>
+                            {item.homepage ? (
+                              <a href={item.homepage.startsWith("http") ? item.homepage : `https://${item.homepage}`} target="_blank" rel="noreferrer">
+                                {item.homepage}
+                              </a>
+                            ) : (
+                              "정보 없음"
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <button
+                      className="button"
+                      type="button"
+                      onClick={() => selectSearchResult(item)}
+                      disabled={!item.can_register}
+                    >
+                      {item.can_register ? "이 기업 선택" : "사업자번호 없음"}
+                    </button>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">
+                  {searchData.message || "검색 결과가 없습니다."}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <form id="company-registration-form" className="company-form" onSubmit={handleSubmit}>
           <label>
             기업명
             <input
