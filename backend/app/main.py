@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .database import Base, engine
 from .routers.companies import router as companies_router
+from .routers.company_search import router as company_search_router
 from .routers.maintenance import router as maintenance_router
 from .schemas import HealthResponse
 
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(companies_router)
+app.include_router(company_search_router)
 app.include_router(maintenance_router)
 
 
