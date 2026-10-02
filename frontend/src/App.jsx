@@ -227,8 +227,17 @@ function CompanyCard({ company, onCheck, onDelete, checking, deleting }) {
 function App() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [autoRefreshing, setAutoRefreshing] = useState(true);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
   const [autoRefreshSummary, setAutoRefreshSummary] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(
+    () => localStorage.getItem("jobsafe_auto_refresh") !== "false",
+  );
+  const [confirmDeleteEnabled, setConfirmDeleteEnabled] = useState(
+    () => localStorage.getItem("jobsafe_confirm_delete") !== "false",
+  );
+  const [companySort, setCompanySort] = useState(
+    () => localStorage.getItem("jobsafe_company_sort") || "recent",
+  );
   const [checkingId, setCheckingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [message, setMessage] = useState("");
@@ -263,30 +272,37 @@ function App() {
     }
   }
 
+  async function runFullRefresh() {
+    setAutoRefreshing(true);
+    setMessage("");
+    try {
+      const summary = await api.refreshAllCompanies();
+      setAutoRefreshSummary(summary);
+      await loadCompanies();
+      return summary;
+    } catch (error) {
+      setMessage(error.message);
+      throw error;
+    } finally {
+      setAutoRefreshing(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function refreshOnEntry() {
-      setAutoRefreshing(true);
+    async function initialize() {
+      await loadCompanies();
+      if (!autoRefreshEnabled || cancelled) return;
+
       try {
-        await loadCompanies();
-        const summary = await api.refreshAllCompanies();
-        if (!cancelled) {
-          setAutoRefreshSummary(summary);
-          await loadCompanies();
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setMessage(error.message);
-        }
-      } finally {
-        if (!cancelled) {
-          setAutoRefreshing(false);
-        }
+        await runFullRefresh();
+      } catch {
+        // Error is already shown through message state.
       }
     }
 
-    refreshOnEntry();
+    initialize();
 
     return () => {
       cancelled = true;
@@ -366,10 +382,12 @@ function App() {
   }
 
   async function handleDelete(company) {
-    const confirmed = window.confirm(
-      `${company.name}을(를) 관심기업에서 삭제할까요? 저장된 점검 이력도 함께 삭제됩니다.`,
-    );
-    if (!confirmed) return;
+    if (confirmDeleteEnabled) {
+      const confirmed = window.confirm(
+        `${company.name}을(를) 관심기업에서 삭제할까요? 저장된 점검 이력도 함께 삭제됩니다.`,
+      );
+      if (!confirmed) return;
+    }
 
     setDeletingId(company.id);
     setMessage("");
@@ -384,7 +402,36 @@ function App() {
     }
   }
 
-  const recentCompanies = companies.slice(0, 3);
+  const sortedCompanies = useMemo(() => {
+    const copy = [...companies];
+
+    if (companySort === "name") {
+      return copy.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    }
+
+    if (companySort === "status") {
+      const rank = { yes: 0, error: 1, not_configured: 2, not_checked: 3, no: 4 };
+      return copy.sort((a, b) => {
+        const aStatus = latestCheck(a)?.wage_arrears_status || "not_checked";
+        const bStatus = latestCheck(b)?.wage_arrears_status || "not_checked";
+        return (rank[aStatus] ?? 9) - (rank[bStatus] ?? 9);
+      });
+    }
+
+    return copy.sort((a, b) => b.id - a.id);
+  }, [companies, companySort]);
+
+  const recentCompanies = [...companies].sort((a, b) => b.id - a.id).slice(0, 3);
+
+  function updateBooleanSetting(key, setter, value) {
+    localStorage.setItem(key, value ? "true" : "false");
+    setter(value);
+  }
+
+  function updateCompanySort(value) {
+    localStorage.setItem("jobsafe_company_sort", value);
+    setCompanySort(value);
+  }
 
   return (
     <>
@@ -603,7 +650,7 @@ function App() {
                     <button className="button" type="button" onClick={() => setActiveTab("add")}>관심기업 추가하기</button>
                   </div>
                 )}
-                {companies.map((company) => (
+                {sortedCompanies.map((company) => (
                   <CompanyCard
                     key={company.id}
                     company={company}
@@ -629,31 +676,88 @@ function App() {
             <section className="panel settings-list">
               <div className="settings-item">
                 <div>
-                  <strong>관심기업 저장 범위</strong>
-                  <p>현재는 이 브라우저의 식별값을 기준으로 관심기업을 분리합니다.</p>
-                </div>
-                <span className="settings-chip">브라우저 기준</span>
-              </div>
-              <div className="settings-item">
-                <div>
-                  <strong>공공데이터 점검</strong>
-                  <p>등록된 기업은 고용24 OPEN API를 통해 임금체불 명단공개 여부를 확인합니다.</p>
-                </div>
-                <span className="settings-chip settings-chip--active">사용 중</span>
-              </div>
-              <div className="settings-item">
-                <div>
-                  <strong>자동 점검 및 알림</strong>
-                  <p>사이트에 접속하면 이 브라우저에 등록된 관심기업 전체를 자동으로 다시 점검합니다.</p>
+                  <strong>접속 시 자동 점검</strong>
+                  <p>사이트에 들어오면 이 브라우저에 등록된 관심기업 전체를 자동으로 다시 점검합니다.</p>
                   {autoRefreshSummary && (
                     <p>
-                      최근 자동점검: {autoRefreshSummary.checked}개 점검 · 변경 {autoRefreshSummary.changed}개 · 실패 {autoRefreshSummary.failed}개
+                      최근 점검: {autoRefreshSummary.checked}개 · 변경 {autoRefreshSummary.changed}개 · 실패 {autoRefreshSummary.failed}개
                     </p>
                   )}
                 </div>
-                <span className="settings-chip settings-chip--active">
-                  {autoRefreshing ? "점검 중" : "사용 중"}
-                </span>
+                <label className="setting-switch">
+                  <input
+                    type="checkbox"
+                    checked={autoRefreshEnabled}
+                    onChange={(event) =>
+                      updateBooleanSetting(
+                        "jobsafe_auto_refresh",
+                        setAutoRefreshEnabled,
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+
+              <div className="settings-item">
+                <div>
+                  <strong>전체 관심기업 지금 점검</strong>
+                  <p>자동 점검을 기다리지 않고 등록된 관심기업 전체를 즉시 다시 조회합니다.</p>
+                </div>
+                <button
+                  className="button button--secondary settings-action"
+                  type="button"
+                  onClick={() => runFullRefresh().catch(() => {})}
+                  disabled={autoRefreshing}
+                >
+                  {autoRefreshing ? "점검 중..." : "전체 점검"}
+                </button>
+              </div>
+
+              <div className="settings-item">
+                <div>
+                  <strong>관심기업 정렬</strong>
+                  <p>관심기업 목록에서 기업이 표시되는 순서를 선택합니다.</p>
+                </div>
+                <select
+                  className="settings-select"
+                  value={companySort}
+                  onChange={(event) => updateCompanySort(event.target.value)}
+                >
+                  <option value="recent">최근 등록순</option>
+                  <option value="name">기업명순</option>
+                  <option value="status">점검 상태 우선</option>
+                </select>
+              </div>
+
+              <div className="settings-item">
+                <div>
+                  <strong>삭제 전 확인</strong>
+                  <p>관심기업 삭제 버튼을 눌렀을 때 한 번 더 확인창을 표시합니다.</p>
+                </div>
+                <label className="setting-switch">
+                  <input
+                    type="checkbox"
+                    checked={confirmDeleteEnabled}
+                    onChange={(event) =>
+                      updateBooleanSetting(
+                        "jobsafe_confirm_delete",
+                        setConfirmDeleteEnabled,
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+
+              <div className="settings-item">
+                <div>
+                  <strong>관심기업 저장 범위</strong>
+                  <p>현재는 로그인 대신 이 브라우저의 식별값을 기준으로 관심기업을 분리합니다.</p>
+                </div>
+                <span className="settings-chip">브라우저 기준</span>
               </div>
             </section>
           </div>
